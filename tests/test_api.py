@@ -29,12 +29,10 @@ def test_end_to_end_flow(client):
     assert get_upload.json()["status"] == "parsed"
 
     analyze_resp = client.post(f"/uploads/{upload_id}/analyze", headers=headers)
-    assert analyze_resp.status_code == 202
-    job_id = analyze_resp.json()["job_id"]
-
-    job_resp = client.get(f"/jobs/{job_id}", headers=headers)
-    assert job_resp.status_code == 200
-    assert job_resp.json()["status"] in {"succeeded", "running", "queued"}
+    assert analyze_resp.status_code == 200
+    analysis_payload = analyze_resp.json()
+    assert "mixed_signal_index" in analysis_payload
+    assert "timeline" in analysis_payload
 
     report_resp = client.get(f"/reports/{upload_id}", headers=headers)
     assert report_resp.status_code == 200
@@ -46,4 +44,3 @@ def test_end_to_end_flow(client):
 
     delete_resp = client.delete(f"/uploads/{upload_id}", headers=headers)
     assert delete_resp.status_code == 204
-

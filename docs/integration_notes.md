@@ -1,82 +1,41 @@
 # Frontend-Backend Integration Notes
 
-## Discovery Findings
+## Current Integration
+- Frontend is served from `GET /` using `app/static/index.html`.
+- Frontend flow is now explicit two-step:
+  1. Upload file
+  2. Click `Analyze texts`
+- Analysis does not start during upload.
 
-### Backend framework
-- FastAPI app in `app/main.py`
-- SQLAlchemy + Alembic for persistence
-- FastAPI background tasks for async analysis jobs (`app/workers/`)
+## Endpoint Contract Used by Frontend
+- `POST /compat/upload`
+  - Accepts file upload and platform metadata
+  - Returns `{ "upload_id": "...", "message_count": N }`
+- `POST /compat/uploads/{upload_id}/analyze`
+  - Calls OpenAI-backed analyzer and returns full report JSON
+- `GET /compat/reports/{upload_id}`
+  - Returns latest stored report JSON
 
-### Existing auth approach
-- JWT bearer auth via:
-  - `POST /auth/register`
-  - `POST /auth/login`
-  - `GET /auth/me`
-- Protected endpoints use `Authorization: Bearer <token>`
+## OpenAI Analysis Integration
+- Service module: `app/services/llm/openai_client.py`
+- Entry function: `analyze_chat_with_llm(messages)`
+- Environment variables:
+  - `OPENAI_API_KEY` (required)
+  - `OPENAI_MODEL` (default `gpt-4o-mini`)
 
-### Existing upload/analysis/report endpoints
-- Upload:
-  - `POST /uploads` (multipart)
-  - Requires auth
-  - Requires `platform` (`whatsapp|imessage|generic`) + optional `timezone_name`
-  - Returns `{ "upload_id": "..." }`
-- Analyze:
-  - `POST /uploads/{upload_id}/analyze`
-  - Requires auth
-  - Returns `{ "job_id": "..." }`
-- Job status:
-  - `GET /jobs/{job_id}`
-  - Requires auth
-  - Returns ORM-backed job shape with `status` + `progress`
-- Report:
-  - `GET /reports/{upload_id}`
-  - Requires auth
-  - Returns rich report (`report_json`) + `mixed_signal_index` + `confidence`
-  - Report internals are richer than the frontend’s needed summary shape
+### Prompting and Validation
+- System prompt enforces evidence-only analysis and no diagnosis/outcome prediction.
+- Developer prompt enforces JSON-only output and exact schema/constraints.
+- Output is validated against Pydantic schema (`app/schemas/llm_report.py`).
+- On validation failure, backend runs one repair retry asking model to fix schema mismatches.
 
-### Background work
-- Background task `analyze_upload_job` processes analysis
-- Job states: `queued|running|succeeded|failed`
-- Retention cleanup can be triggered manually
+## Long Conversation Truncation Strategy
+To keep latency and token use bounded while preserving evidence quality:
+- Keep most recent `K` messages verbatim (currently 120).
+- Summarize older messages into compressed context with the model.
+- Analyze using compressed older context + recent verbatim messages.
 
-### Dev run mode
-- Local run uses `uvicorn` without container dependencies
-
-## Mismatches vs Frontend Needs
-- Frontend is static/no-JS currently and has no auth flow.
-- Existing APIs require JWT and extra upload metadata.
-- Frontend needs straightforward upload -> analyze -> poll -> report sequence.
-- Frontend needs simplified report JSON:
-  - `mixed_signal_index`, `confidence`, `timeline[]`, `stats{}`
-
-## Planned Changes (Minimal)
-- Add a small compat router with unauthenticated endpoints for this static page:
-  - `POST /compat/upload`
-  - `POST /compat/uploads/{upload_id}/analyze`
-  - `GET /compat/jobs/{job_id}`
-  - `GET /compat/reports/{upload_id}`
-- Compat router will internally reuse existing models/services and keep original endpoints unchanged.
-- Add `GET /` to serve static `app/static/index.html`.
-- Move provided static frontend into `app/static/index.html` and inject minimal vanilla JS only:
-  - hidden file input
-  - upload-zone + CTA wiring
-  - upload/analyze/poll/report flow
-  - DOM patching for badge/timeline/stats
-  - loading/error states
-  - `window.API_BASE` config support
-- Update README with exact run and access instructions for integrated frontend.
-
-## Changes Implemented
-- Added `app/routers/compat.py` with unauthenticated adapter endpoints for static frontend:
-  - `POST /compat/upload` -> `{ upload_id }`
-  - `POST /compat/uploads/{upload_id}/analyze` -> `{ job_id }`
-  - `GET /compat/jobs/{job_id}` -> `{ job_id, status, progress, error }`
-  - `GET /compat/reports/{upload_id}` -> frontend summary shape + `full_report`
-- Kept existing authenticated API routes unchanged.
-- Added frontend serving at `GET /` from `app/static/index.html`.
-- Integrated static HTML with minimal vanilla JS:
-  - hidden file input + click wiring from upload zone/CTA
-  - upload -> analyze -> poll -> report flow
-  - dashboard badge/timeline/stats populated from live API data
-  - loading and error text states
-  - `window.API_BASE` override support (defaults to same origin)
+## Privacy Notes
+- Raw chat text stays encrypted at rest in DB.
+- Analysis service does not log raw message text.
+- Final report is stored in `reports.report_json`.

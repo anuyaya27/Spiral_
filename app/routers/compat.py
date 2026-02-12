@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import decrypt_text, encrypt_text
+from app.core.security import encrypt_text
 from app.db.session import get_db
-from app.models.excerpt import Excerpt
 from app.models.job import Job
 from app.models.message import Message
 from app.models.participant import Participant
@@ -15,7 +14,8 @@ from app.models.report import Report
 from app.models.upload import Upload
 from app.services.parsing import parse_chat_export
 from app.services.storage import delete_file_if_exists, save_upload_file
-from app.workers.tasks import analyze_upload_job
+from app.services.analysis.runner import analyze_upload_and_store
+from app.schemas.llm_report import LLMReport
 
 router = APIRouter(prefix="/compat", tags=["compat"])
 
@@ -75,20 +75,21 @@ async def compat_upload(
             )
         )
     db.commit()
-    return {"upload_id": upload.id}
+    return {"upload_id": upload.id, "message_count": len(parsed.messages)}
 
 
-@router.post("/uploads/{upload_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
-def compat_analyze(upload_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict:
+@router.post("/uploads/{upload_id}/analyze", response_model=LLMReport)
+def compat_analyze(upload_id: str, db: Session = Depends(get_db)) -> LLMReport:
     upload = db.scalar(select(Upload).where(Upload.id == upload_id))
     if not upload:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found")
-    job = Job(upload_id=upload.id, status="queued", progress=0)
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    background_tasks.add_task(analyze_upload_job, job.id)
-    return {"job_id": job.id}
+    try:
+        report_payload = analyze_upload_and_store(db, upload.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Analysis failed. Please retry.") from exc
+    return LLMReport.model_validate(report_payload)
 
 
 @router.get("/jobs/{job_id}")
@@ -104,15 +105,7 @@ def compat_report(upload_id: str, db: Session = Depends(get_db)) -> dict:
     report = db.scalar(select(Report).where(Report.upload_id == upload_id))
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    report_json = _hydrate_moments_with_excerpt_text(db, upload_id, report.report_json)
-    timeline, stats = _summarize_for_frontend(report_json)
-    return {
-        "mixed_signal_index": round(float(report.mixed_signal_index), 2),
-        "confidence": round(float(report.confidence), 3),
-        "timeline": timeline,
-        "stats": stats,
-        "full_report": report_json,
-    }
+    return report.report_json
 
 
 def _platform_from_filename(filename: str) -> str:
@@ -122,91 +115,3 @@ def _platform_from_filename(filename: str) -> str:
     if lowered.endswith(".json"):
         return "generic"
     return ""
-
-
-def _hydrate_moments_with_excerpt_text(db: Session, upload_id: str, report_json: dict) -> dict:
-    import copy
-
-    payload = copy.deepcopy(report_json)
-    rows = db.scalars(select(Excerpt).where(Excerpt.upload_id == upload_id)).all()
-    by_message_id = {row.message_id: row for row in rows}
-    for moment in payload.get("moments_of_ambiguity", []):
-        for excerpt in moment.get("excerpts", []):
-            row = by_message_id.get(excerpt.get("message_id"))
-            excerpt["text"] = decrypt_text(row.encrypted_excerpt) if row else ""
-    return payload
-
-
-def _summarize_for_frontend(report_json: dict) -> tuple[list[dict], dict]:
-    timeline: list[dict] = []
-    moments = report_json.get("moments_of_ambiguity", [])
-    for moment in moments:
-        label = str(moment.get("label", "Mixed signal"))
-        detectors = [str(d) for d in moment.get("detectors_triggered", [])]
-        timeline_type = _type_from_detectors(detectors)
-        for excerpt in moment.get("excerpts", [])[:2]:
-            ts = excerpt.get("ts")
-            timeline.append(
-                {
-                    "timestamp": ts,
-                    "message": excerpt.get("text", ""),
-                    "tags": _tags_from_label_and_detectors(label, detectors),
-                    "type": timeline_type,
-                }
-            )
-    timeline = [t for t in timeline if t.get("timestamp") and t.get("message")][:8]
-    timeline.sort(key=lambda item: item["timestamp"])
-
-    timeline_metrics = report_json.get("timeline_metrics", {})
-    initiation_counts = timeline_metrics.get("initiation_counts", {})
-    initiation_percent = _initiation_percent(initiation_counts)
-    reply_ratio = _reply_delay_ratio(timeline_metrics.get("response_time_stats", {}))
-    red_flags = _red_flag_count(report_json.get("detectors", []))
-
-    return timeline, {
-        "initiation_percent": initiation_percent,
-        "reply_delay_ratio": reply_ratio,
-        "red_flags": red_flags,
-    }
-
-
-def _type_from_detectors(detectors: list[str]) -> str:
-    joined = " ".join(detectors)
-    if any(token in joined for token in ("warm_cold", "contradiction", "unresolved")):
-        return "mixed"
-    if any(token in joined for token in ("boundary", "latency")):
-        return "cool"
-    return "warm"
-
-
-def _tags_from_label_and_detectors(label: str, detectors: list[str]) -> list[str]:
-    tags = [label.upper()[:26]]
-    tags.extend(det.replace("_", " ").upper()[:24] for det in detectors[:2])
-    return tags[:3]
-
-
-def _initiation_percent(initiation_counts: dict) -> int:
-    if not initiation_counts:
-        return 0
-    values = list(initiation_counts.values())
-    total = sum(values)
-    if total <= 0:
-        return 0
-    return int(round((max(values) / total) * 100))
-
-
-def _reply_delay_ratio(response_time_stats: dict) -> float:
-    averages = [float(item.get("avg_minutes", 0)) for item in response_time_stats.values() if item.get("avg_minutes")]
-    if len(averages) < 2:
-        return 1.0
-    low = min(averages)
-    high = max(averages)
-    if low <= 0:
-        return 1.0
-    return round(high / low, 2)
-
-
-def _red_flag_count(detectors: list[dict]) -> int:
-    if not detectors:
-        return 0
-    return int(round(sum(float(det.get("score", 0)) for det in detectors) * 3))

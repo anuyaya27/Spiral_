@@ -1,6 +1,6 @@
 # Mixed Signals Recognition Backend
 
-FastAPI backend for uploading chat exports, parsing/normalizing messages, running mixed-signals analysis, and returning structured reports.
+FastAPI backend for uploading chat exports, normalizing messages, and generating structured mixed-signals reports with the OpenAI API.
 
 ## Tech Stack
 - Python 3.11+
@@ -8,96 +8,94 @@ FastAPI backend for uploading chat exports, parsing/normalizing messages, runnin
 - SQLAlchemy 2.0 + Alembic
 - SQLite by default (`app.db`)
 - Optional PostgreSQL via `DATABASE_URL`
+- OpenAI Python SDK
 - Pytest
 
-## Core Capabilities
-- Auth:
-  - `POST /auth/register`
-  - `POST /auth/login`
-  - `GET /auth/me`
-- Upload lifecycle:
-  - `POST /uploads` (multipart)
-  - `GET /uploads/{upload_id}`
-  - `DELETE /uploads/{upload_id}`
-- Analysis jobs:
-  - `POST /uploads/{upload_id}/analyze`
-  - `GET /jobs/{job_id}`
-- Reports:
-  - `GET /reports/{upload_id}`
-  - `GET /reports/{upload_id}/highlights`
-  - `GET /reports/{upload_id}/download?format=json|pdf`
-- Frontend compatibility adapters:
-  - `POST /compat/upload`
-  - `POST /compat/uploads/{upload_id}/analyze`
-  - `GET /compat/jobs/{job_id}`
-  - `GET /compat/reports/{upload_id}`
+## Workflow
+1. Upload a chat file (`.txt` or `.json`).
+2. User explicitly clicks `Analyze texts`.
+3. Backend calls OpenAI and returns a structured report.
 
-## Privacy and Security
-- Raw message content is encrypted at rest with Fernet (`messages.encrypted_text`, `excerpts.encrypted_excerpt`).
-- Structured logging filter redacts text-like fields.
-- JWT auth, bcrypt password hashing.
-- Upload validation: extension/content-type whitelist + max file size.
-- Rate limiting middleware (`RATE_LIMIT_PER_MINUTE` per IP).
-- Hard delete endpoint removes upload + derived artifacts.
-- Retention cleanup logic deletes data past `retention_until`.
+## Core Endpoints
+- `POST /uploads`
+  - Stores parsed/encrypted chat messages
+  - Returns `{ "upload_id": "...", "message_count": N }`
+- `POST /uploads/{upload_id}/analyze`
+  - Runs OpenAI analysis only when called
+  - Returns report schema directly
+- `GET /reports/{upload_id}`
+  - Returns latest report for upload
 
-## Project Structure
-```text
-app/
-  main.py
-  core/
-  db/
-  models/
-  routers/
-  schemas/
-  services/
-  workers/
-tests/
-alembic.ini
+Static frontend compatibility endpoints:
+- `POST /compat/upload`
+- `POST /compat/uploads/{upload_id}/analyze`
+- `GET /compat/reports/{upload_id}`
+
+## Report Schema
+```json
+{
+  "mixed_signal_index": 0,
+  "confidence": 0.0,
+  "summary": "",
+  "timeline": [
+    {
+      "timestamp": "2026-01-01T00:00:00Z",
+      "message": "",
+      "tags": ["HIGH ENERGY"],
+      "type": "mixed"
+    }
+  ],
+  "stats": {
+    "initiation_percent": 0,
+    "reply_delay_ratio": 0,
+    "red_flags": 0
+  },
+  "signals": [
+    {
+      "name": "Warm-cold cycles",
+      "score": 0.0,
+      "explanation": "",
+      "evidence": [
+        {"timestamp": "2026-01-01T00:00:00Z", "excerpt": "", "sender": ""}
+      ]
+    }
+  ]
+}
 ```
+
+## Privacy and Safety
+- Raw message content remains encrypted at rest (`messages.encrypted_text`).
+- Raw text is not logged by analysis services.
+- Long conversations use truncation:
+  - older messages are compressed into a model-generated summary
+  - most recent messages are kept verbatim for evidence fidelity
 
 ## Local Development
 1. Create a virtual environment:
-   - Windows PowerShell: `python -m venv venv`
-   - Activate: `venv\Scripts\activate`
+   - `python -m venv venv`
+   - `venv\Scripts\activate` (Windows)
 2. Install dependencies:
    - `pip install -r requirements.txt`
 3. Create env file:
    - `Copy-Item .env.example .env`
-4. Set secure values in `.env`:
+4. Set required env values:
+   - `OPENAI_API_KEY`
+   - Optional `OPENAI_MODEL` (default `gpt-4o-mini`)
    - `JWT_SECRET`
    - `ENCRYPTION_KEY`
 5. Run migrations:
    - `alembic upgrade head`
-6. Start API:
+6. Start server:
    - `uvicorn app.main:app --reload`
 7. Open:
-   - API docs: `http://127.0.0.1:8000/docs`
-   - Frontend: `http://127.0.0.1:8000/`
+   - `http://127.0.0.1:8000/`
+   - `http://127.0.0.1:8000/docs`
 
-## Database Configuration
-Default development database:
-- `DATABASE_URL="sqlite:///./app.db"`
-
-Optional PostgreSQL:
-- Example: `DATABASE_URL="postgresql+psycopg://user:password@127.0.0.1:5432/mixedsignals"`
-
-## Background Execution
-- Analysis jobs are dispatched with FastAPI `BackgroundTasks` in local mode.
-- Retention cleanup can be run manually:
-  - `make cleanup`
+## Manual Test
+1. Open the frontend.
+2. Upload a chat export.
+3. Click `Analyze texts`.
+4. Verify badge, timeline, and stats update with live report data.
 
 ## Run Tests
 - `pytest -q`
-
-## End-to-End Flow
-1. Register/login
-2. Upload a chat export
-3. Trigger analysis job
-4. Poll job status
-5. Fetch report/highlights
-6. Delete upload to hard-delete artifacts
-
-## Static Frontend Integration
-- `GET /` serves `app/static/index.html`.
-- Default API base is same-origin; override by setting `window.API_BASE` before script init.

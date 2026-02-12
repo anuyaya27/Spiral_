@@ -13,14 +13,10 @@ def test_compat_end_to_end(client):
     upload_id = upload_resp.json()["upload_id"]
 
     analyze_resp = client.post(f"/compat/uploads/{upload_id}/analyze")
-    assert analyze_resp.status_code == 202, analyze_resp.text
-    job_id = analyze_resp.json()["job_id"]
-
-    job_resp = client.get(f"/compat/jobs/{job_id}")
-    assert job_resp.status_code == 200
-    job = job_resp.json()
-    assert "status" in job
-    assert "progress" in job
+    assert analyze_resp.status_code == 200, analyze_resp.text
+    analyzed = analyze_resp.json()
+    assert "mixed_signal_index" in analyzed
+    assert "timeline" in analyzed
 
     report_resp = client.get(f"/compat/reports/{upload_id}")
     assert report_resp.status_code == 200, report_resp.text
@@ -29,4 +25,3 @@ def test_compat_end_to_end(client):
     assert "confidence" in payload
     assert "timeline" in payload
     assert "stats" in payload
-

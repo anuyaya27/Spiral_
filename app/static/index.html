@@ -503,6 +503,7 @@
                 <div class="upload-subtext">WhatsApp â€¢ iMessage â€¢ Instagram DMs â€¢ Discord</div>
             </div>
             <input type="file" id="chat-file-input" accept=".txt,.json" hidden>
+            <button id="analyze-btn" type="button" class="btn-cta" style="margin-top: 20px; opacity: 0.5;" disabled>Analyze texts</button>
             <p id="upload-status" style="margin-top: 14px; font-weight: 800; color: #FF1493;"></p>
             <p id="upload-error" style="margin-top: 8px; font-weight: 700; color: #d6004c;"></p>
         </div>
@@ -571,7 +572,7 @@
         </div>
 
         <div class="cta">
-            <button class="btn-cta">GET MY REPORT FREE</button>
+            <button id="pick-file-btn" type="button" class="btn-cta">GET MY REPORT FREE</button>
             <div class="privacy">
                 totally private â€¢ never stored
             </div>
@@ -587,13 +588,17 @@
 
     (function () {
         const uploadZone = document.querySelector(".upload-zone");
-        const ctaBtn = document.querySelector(".btn-cta");
+        const ctaBtn = document.getElementById("pick-file-btn");
+        const analyzeBtn = document.getElementById("analyze-btn");
         const fileInput = document.getElementById("chat-file-input");
         const statusEl = document.getElementById("upload-status");
         const errorEl = document.getElementById("upload-error");
+        const uploadTextEl = document.querySelector(".upload-text");
         const signalBadge = document.querySelector(".signal-badge");
         const timelineEl = document.querySelector(".timeline");
         const statNums = document.querySelectorAll(".stat .stat-num");
+        let readyUploadId = "";
+        let analyzing = false;
 
         function apiUrl(path) {
             const base = (window.API_BASE || "").trim();
@@ -606,6 +611,8 @@
             uploadZone.style.pointerEvents = isBusy ? "none" : "auto";
             ctaBtn.disabled = isBusy;
             ctaBtn.style.opacity = isBusy ? "0.7" : "1";
+            analyzeBtn.disabled = isBusy || !readyUploadId;
+            analyzeBtn.style.opacity = analyzeBtn.disabled ? "0.5" : "1";
         }
 
         function guessPlatform(fileName) {
@@ -655,11 +662,13 @@
             if (statNums[2]) statNums[2].textContent = String(Math.round(Number(stats.red_flags || 0)));
         }
 
-        async function runAnalysisFlow(file) {
+        async function uploadFile(file) {
             errorEl.textContent = "";
+            readyUploadId = "";
             setBusy(true);
             try {
                 statusEl.textContent = "uploading...";
+                uploadTextEl.textContent = "uploading file...";
                 const formData = new FormData();
                 formData.append("file", file);
                 formData.append("platform", guessPlatform(file.name));
@@ -668,43 +677,67 @@
                 const uploadRes = await fetch(apiUrl("/compat/upload"), { method: "POST", body: formData });
                 if (!uploadRes.ok) throw new Error("upload failed");
                 const uploadData = await uploadRes.json();
-
-                statusEl.textContent = "analyzing...";
-                const analyzeRes = await fetch(apiUrl("/compat/uploads/" + uploadData.upload_id + "/analyze"), { method: "POST" });
-                if (!analyzeRes.ok) throw new Error("analysis start failed");
-                const analyzeData = await analyzeRes.json();
-
-                let completed = false;
-                const started = Date.now();
-                while (!completed) {
-                    if (Date.now() - started > 5 * 60 * 1000) throw new Error("analysis timed out");
-                    await new Promise((resolve) => setTimeout(resolve, 1500));
-                    const jobRes = await fetch(apiUrl("/compat/jobs/" + analyzeData.job_id));
-                    if (!jobRes.ok) throw new Error("job status failed");
-                    const job = await jobRes.json();
-                    if (job.status === "failed") throw new Error(job.error || "analysis failed");
-                    if (job.status === "succeeded") completed = true;
-                }
-
-                const reportRes = await fetch(apiUrl("/compat/reports/" + uploadData.upload_id));
-                if (!reportRes.ok) throw new Error("report fetch failed");
-                const report = await reportRes.json();
-                renderReport(report);
-                statusEl.textContent = "complete";
+                readyUploadId = uploadData.upload_id;
+                statusEl.textContent = "uploaded \u2713 ready to analyze";
+                uploadTextEl.textContent = "uploaded \u2713 ready to analyze";
             } catch (err) {
                 statusEl.textContent = "";
-                errorEl.textContent = "something went wrong while processing your chat. please try again.";
+                errorEl.textContent = "upload failed. please try a valid .txt or .json export.";
+                uploadTextEl.textContent = "drop your exported chat here";
             } finally {
                 setBusy(false);
                 fileInput.value = "";
             }
         }
 
-        uploadZone.addEventListener("click", function () { fileInput.click(); });
-        ctaBtn.addEventListener("click", function () { fileInput.click(); });
+        async function analyzeUploadedFile() {
+            if (!readyUploadId) return;
+            if (analyzing) return;
+            errorEl.textContent = "";
+            analyzing = true;
+            setBusy(true);
+            try {
+                console.log("[analyze] upload_id:", readyUploadId);
+                statusEl.textContent = "analyzing...";
+                const analyzeRes = await fetch(apiUrl("/compat/uploads/" + readyUploadId + "/analyze"), { method: "POST" });
+                let analyzePayload = null;
+                try {
+                    analyzePayload = await analyzeRes.json();
+                } catch (_) {
+                    analyzePayload = null;
+                }
+                console.log("[analyze] response:", { status: analyzeRes.status, body: analyzePayload });
+                if (!analyzeRes.ok) {
+                    let detail = "analysis failed. please retry.";
+                    if (analyzeRes.status === 400 && analyzePayload && analyzePayload.detail) {
+                        detail = String(analyzePayload.detail);
+                    } else if (analyzePayload && analyzePayload.detail) {
+                        detail = String(analyzePayload.detail);
+                    }
+                    throw new Error(detail);
+                }
+                const report = analyzePayload || {};
+                renderReport(report);
+                statusEl.textContent = "analysis complete";
+            } catch (err) {
+                statusEl.textContent = "uploaded \u2713 ready to analyze";
+                errorEl.textContent = String(err.message || "analysis failed. please retry.");
+            } finally {
+                analyzing = false;
+                setBusy(false);
+                if (readyUploadId) uploadTextEl.textContent = "uploaded \u2713 ready to analyze";
+            }
+        }
+
+        uploadZone.addEventListener("click", function (event) { event.preventDefault(); fileInput.click(); });
+        ctaBtn.addEventListener("click", function (event) { event.preventDefault(); fileInput.click(); });
+        analyzeBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            analyzeUploadedFile();
+        });
         fileInput.addEventListener("change", function (event) {
             const file = event.target.files && event.target.files[0];
-            if (file) runAnalysisFlow(file);
+            if (file) uploadFile(file);
         });
     })();
 </script>
