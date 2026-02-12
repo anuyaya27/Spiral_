@@ -12,11 +12,7 @@ class Settings(BaseSettings):
     environment: Literal["dev", "test", "prod"] = "dev"
     debug: bool = False
 
-    database_url: str = "sqlite:///./mixedsignals.db"
-    redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str | None = None
-    celery_result_backend: str | None = None
-    celery_task_always_eager: bool = False
+    database_url: str = "sqlite:///./app.db"
 
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
@@ -31,12 +27,6 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     ambiguity_windows_top_n: int = 5
     auto_create_tables: bool = True
-
-    def get_celery_broker_url(self) -> str:
-        return self.celery_broker_url or self.redis_url
-
-    def get_celery_result_backend(self) -> str:
-        return self.celery_result_backend or self.redis_url
 
 
 @lru_cache(maxsize=1)

@@ -5,7 +5,7 @@
 ### Backend framework
 - FastAPI app in `app/main.py`
 - SQLAlchemy + Alembic for persistence
-- Celery + Redis for async analysis jobs (`app/workers/`)
+- FastAPI background tasks for async analysis jobs (`app/workers/`)
 
 ### Existing auth approach
 - JWT bearer auth via:
@@ -35,13 +35,12 @@
   - Report internals are richer than the frontend’s needed summary shape
 
 ### Background work
-- Celery task `analyze_upload_job` processes analysis
+- Background task `analyze_upload_job` processes analysis
 - Job states: `queued|running|succeeded|failed`
-- Daily retention cleanup task via Celery beat
+- Retention cleanup can be triggered manually
 
 ### Dev run mode
-- Docker compose includes `api`, `worker`, `beat`, `postgres`, `redis`
-- Non-docker run uses `uvicorn` and separate `celery` worker/beat
+- Local run uses `uvicorn` without container dependencies
 
 ## Mismatches vs Frontend Needs
 - Frontend is static/no-JS currently and has no auth flow.

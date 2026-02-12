@@ -5,7 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 os.environ["AUTO_CREATE_TABLES"] = "true"
 os.environ["ENCRYPTION_KEY"] = "aLxM0wHk0w0oVx3G9iYfn7lr5J2v3xH5cM8D6lQ1t2Q="
 
@@ -30,4 +29,3 @@ def client():
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
-

@@ -1,18 +1,12 @@
 PYTHON ?= python
 
-.PHONY: install run worker beat test migrate upgrade
+.PHONY: install run test migrate upgrade cleanup
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 run:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-worker:
-	celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
-
-beat:
-	celery -A app.workers.celery_app:celery_app beat --loglevel=INFO
+	uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 test:
 	pytest -q
@@ -23,3 +17,5 @@ migrate:
 upgrade:
 	alembic upgrade head
 
+cleanup:
+	python -c "from app.workers.tasks import retention_cleanup_job; print(retention_cleanup_job())"

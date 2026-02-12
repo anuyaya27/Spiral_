@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -115,6 +115,7 @@ def delete_upload(
 @router.post("/{upload_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
 def analyze_upload(
     upload_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -126,12 +127,5 @@ def analyze_upload(
     db.commit()
     db.refresh(job)
 
-    settings = get_settings()
-    if settings.celery_task_always_eager:
-        analyze_upload_job(job.id)
-    else:
-        task = analyze_upload_job.delay(job.id)
-        job.task_id = task.id
-        db.add(job)
-        db.commit()
+    background_tasks.add_task(analyze_upload_job, job.id)
     return {"job_id": job.id}

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -79,7 +79,7 @@ async def compat_upload(
 
 
 @router.post("/uploads/{upload_id}/analyze", status_code=status.HTTP_202_ACCEPTED)
-def compat_analyze(upload_id: str, db: Session = Depends(get_db)) -> dict:
+def compat_analyze(upload_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict:
     upload = db.scalar(select(Upload).where(Upload.id == upload_id))
     if not upload:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found")
@@ -87,14 +87,7 @@ def compat_analyze(upload_id: str, db: Session = Depends(get_db)) -> dict:
     db.add(job)
     db.commit()
     db.refresh(job)
-    settings = get_settings()
-    if settings.celery_task_always_eager:
-        analyze_upload_job(job.id)
-    else:
-        task = analyze_upload_job.delay(job.id)
-        job.task_id = task.id
-        db.add(job)
-        db.commit()
+    background_tasks.add_task(analyze_upload_job, job.id)
     return {"job_id": job.id}
 
 
@@ -217,4 +210,3 @@ def _red_flag_count(detectors: list[dict]) -> int:
     if not detectors:
         return 0
     return int(round(sum(float(det.get("score", 0)) for det in detectors) * 3))
-

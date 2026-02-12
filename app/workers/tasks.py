@@ -13,13 +13,11 @@ from app.services.analysis.pipeline import run_analysis
 from app.services.retention import run_retention_cleanup
 from app.core.config import get_settings
 from app.core.security import encrypt_text
-from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-@celery_app.task(name="app.workers.tasks.analyze_upload_job")
 def analyze_upload_job(job_id: str) -> None:
     db = SessionLocal()
     try:
@@ -94,7 +92,6 @@ def analyze_upload_job(job_id: str) -> None:
         db.close()
 
 
-@celery_app.task(name="app.workers.tasks.retention_cleanup_job")
 def retention_cleanup_job() -> int:
     db = SessionLocal()
     try:
