@@ -1,0 +1,717 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ðŸ’Œ mixed signals detector ðŸ’Œ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Karla:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Karla', sans-serif;
+            background: linear-gradient(180deg, #FFE5F1 0%, #E5F3FF 50%, #FFF4E5 100%);
+            color: #1a1a1a;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Y2K style floating bubbles */
+        .bubble {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: floatBubble 15s infinite ease-in-out;
+            z-index: 0;
+        }
+
+        .bubble1 {
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle at 30% 30%, #FF69B4, #FF1493);
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .bubble2 {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle at 30% 30%, #87CEEB, #4682B4);
+            top: 60%;
+            right: 5%;
+            animation-delay: 3s;
+        }
+
+        .bubble3 {
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+            bottom: 15%;
+            left: 15%;
+            animation-delay: 6s;
+        }
+
+        @keyframes floatBubble {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header with Y2K flair */
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: slideInTop 0.8s ease-out;
+        }
+
+        @keyframes slideInTop {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            font-family: 'Righteous', cursive;
+            font-size: 56px;
+            background: linear-gradient(45deg, #FF1493, #FF69B4, #FF1493);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease infinite;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 0 rgba(255, 105, 180, 0.3);
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .tagline {
+            font-size: 20px;
+            font-weight: 600;
+            color: #FF1493;
+            text-transform: lowercase;
+        }
+
+        /* Main upload card with glossy Y2K effect */
+        .upload-card {
+            background: white;
+            border: 4px solid #FF69B4;
+            border-radius: 30px;
+            padding: 50px 40px;
+            margin-bottom: 40px;
+            box-shadow: 
+                8px 8px 0 rgba(255, 20, 147, 0.2),
+                0 10px 40px rgba(255, 105, 180, 0.3);
+            text-align: center;
+            position: relative;
+            animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s both;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .upload-card::before {
+            content: 'â˜…';
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: #FFD700;
+            animation: spin 4s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .upload-card h2 {
+            font-family: 'Righteous', cursive;
+            font-size: 36px;
+            color: #FF1493;
+            margin-bottom: 15px;
+        }
+
+        .upload-card p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #666;
+        }
+
+        .upload-zone {
+            background: linear-gradient(135deg, #FFE5F1 0%, #E5F3FF 100%);
+            border: 3px dashed #FF69B4;
+            border-radius: 20px;
+            padding: 60px 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone:hover {
+            background: linear-gradient(135deg, #FFB5D5 0%, #B5D5FF 100%);
+            border-color: #FF1493;
+            transform: scale(1.02);
+        }
+
+        .upload-emoji {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: inline-block;
+            animation: wiggle 1s ease-in-out infinite;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+
+        .upload-text {
+            font-size: 22px;
+            font-weight: 800;
+            color: #FF1493;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 16px;
+            color: #666;
+        }
+
+        /* Features with chunky borders */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .feature {
+            background: white;
+            border: 4px solid #1a1a1a;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            animation: slideInUp 0.6s ease-out both;
+        }
+
+        .feature:nth-child(1) {
+            animation-delay: 0.4s;
+            border-color: #FF69B4;
+        }
+
+        .feature:nth-child(2) {
+            animation-delay: 0.5s;
+            border-color: #87CEEB;
+        }
+
+        .feature:nth-child(3) {
+            animation-delay: 0.6s;
+            border-color: #FFD700;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .feature:hover {
+            transform: translateY(-10px);
+            box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.15);
+        }
+
+        .feature-emoji {
+            font-size: 60px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .feature h3 {
+            font-family: 'Righteous', cursive;
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+        }
+
+        .feature p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        /* Dashboard preview with retro terminal vibes */
+        .dashboard {
+            background: #1a1a1a;
+            border: 4px solid #00FF00;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            animation: fadeInScale 0.8s ease-out 0.7s both;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .dashboard-title {
+            font-family: 'Righteous', cursive;
+            font-size: 28px;
+            color: #00FF00;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .signal-badge {
+            background: #FF1493;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 16px;
+            border: 3px solid white;
+        }
+
+        .timeline {
+            padding: 30px 0;
+        }
+
+        .timeline-entry {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 6px solid;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-entry:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(10px);
+        }
+
+        .timeline-entry.warm { border-color: #FF69B4; }
+        .timeline-entry.cool { border-color: #87CEEB; }
+        .timeline-entry.mixed { border-color: #FFD700; }
+
+        .timeline-time {
+            color: #00FF00;
+            font-size: 13px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .timeline-msg {
+            color: white;
+            font-size: 16px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            margin-right: 8px;
+            margin-top: 5px;
+            border: 2px solid;
+        }
+
+        .tag.warm {
+            background: #FF69B4;
+            color: white;
+            border-color: #FF1493;
+        }
+
+        .tag.cool {
+            background: #87CEEB;
+            color: #1a1a1a;
+            border-color: #4682B4;
+        }
+
+        .tag.mixed {
+            background: #FFD700;
+            color: #1a1a1a;
+            border-color: #FFA500;
+        }
+
+        /* Stats with chunky styling */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat {
+            background: white;
+            border: 4px solid #00FF00;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .stat-num {
+            font-family: 'Righteous', cursive;
+            font-size: 42px;
+            color: #FF1493;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            font-weight: 800;
+            color: #1a1a1a;
+            text-transform: uppercase;
+        }
+
+        /* CTA */
+        .cta {
+            text-align: center;
+            padding: 50px 20px;
+        }
+
+        .btn-cta {
+            font-family: 'Righteous', cursive;
+            background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%);
+            color: white;
+            border: 4px solid #1a1a1a;
+            border-radius: 50px;
+            padding: 20px 50px;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            animation: buttonBounce 2s ease-in-out infinite;
+        }
+
+        @keyframes buttonBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .btn-cta:hover {
+            transform: scale(1.1) translateY(-5px);
+            box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.3);
+            animation: none;
+        }
+
+        .privacy {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            border: 3px solid #1a1a1a;
+            padding: 15px 25px;
+            border-radius: 50px;
+            margin-top: 25px;
+            font-weight: 800;
+            font-size: 15px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 40px; }
+            .upload-card { padding: 35px 25px; }
+            .dashboard { padding: 25px; }
+            .btn-cta { padding: 18px 40px; font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bubble bubble1"></div>
+    <div class="bubble bubble2"></div>
+    <div class="bubble bubble3"></div>
+
+    <div class="container">
+        <header>
+            <h1 class="logo">ðŸ’Œ mixed signals detector ðŸ’Œ</h1>
+            <p class="tagline">read between the lines & know what's really up</p>
+        </header>
+
+        <div class="upload-card">
+            <h2>upload ur chat rn !!!</h2>
+            <p>we'll decode all the weird energy shifts & give you the TRUTH</p>
+            <div class="upload-zone">
+                <div class="upload-emoji">ðŸ“²</div>
+                <div class="upload-text">drop your exported chat here</div>
+                <div class="upload-subtext">WhatsApp â€¢ iMessage â€¢ Instagram DMs â€¢ Discord</div>
+            </div>
+            <input type="file" id="chat-file-input" accept=".txt,.json" hidden>
+            <p id="upload-status" style="margin-top: 14px; font-weight: 800; color: #FF1493;"></p>
+            <p id="upload-error" style="margin-top: 8px; font-weight: 700; color: #d6004c;"></p>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <span class="feature-emoji">ðŸ”®</span>
+                <h3>vibe analysis</h3>
+                <p>track every shift in energy. we catch when they're being hot, cold, or playing games so you can stop second-guessing yourself.</p>
+            </div>
+            <div class="feature">
+                <span class="feature-emoji">ðŸ“ˆ</span>
+                <h3>visual timeline</h3>
+                <p>see the whole relationship arc mapped out. who's chasing who? when did things get weird? it's all visualized.</p>
+            </div>
+            <div class="feature">
+                <span class="feature-emoji">ðŸ§¾</span>
+                <h3>hard evidence</h3>
+                <p>we pull the exact messages that created confusion. no guessing, no opinionsâ€”just straight facts from your actual convo.</p>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <h2 class="dashboard-title">&gt; analysis complete_</h2>
+                <div class="signal-badge">72% MIXED SIGNALS</div>
+            </div>
+
+            <div class="timeline">
+                <div class="timeline-entry warm">
+                    <div class="timeline-time">jan 15 â€¢ 11:23pm</div>
+                    <div class="timeline-msg">"omg i miss you so much can we hang tmrw?? ðŸ’•"</div>
+                    <span class="tag warm">HIGH ENERGY</span>
+                    <span class="tag warm">INITIATED</span>
+                </div>
+
+                <div class="timeline-entry mixed">
+                    <div class="timeline-time">jan 16 â€¢ 3:47pm</div>
+                    <div class="timeline-msg">"sorry i've been so busy lately"</div>
+                    <span class="tag mixed">VIBE SHIFT</span>
+                    <span class="tag cool">DEFLECTION</span>
+                </div>
+
+                <div class="timeline-entry cool">
+                    <div class="timeline-time">jan 17 â€¢ 9:12am</div>
+                    <div class="timeline-msg">"k"</div>
+                    <span class="tag cool">LOW EFFORT</span>
+                    <span class="tag cool">CLOSED OFF</span>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-num">43%</div>
+                    <div class="stat-label">who initiates</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num">4.1x</div>
+                    <div class="stat-label">slower replies</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num">15</div>
+                    <div class="stat-label">red flags</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cta">
+            <button class="btn-cta">â˜… GET MY REPORT FREE â˜…</button>
+            <div class="privacy">
+                ðŸ” totally private â€¢ never stored
+            </div>
+        </div>
+
+        <footer>
+            <p>built for ppl who deserve clarity âœ¨<br>
+            no judgement â€¢ no predictions â€¢ just DATA</p>
+        </footer>
+    </div>
+<script>
+    window.API_BASE = window.API_BASE || "";
+
+    (function () {
+        const uploadZone = document.querySelector(".upload-zone");
+        const ctaBtn = document.querySelector(".btn-cta");
+        const fileInput = document.getElementById("chat-file-input");
+        const statusEl = document.getElementById("upload-status");
+        const errorEl = document.getElementById("upload-error");
+        const signalBadge = document.querySelector(".signal-badge");
+        const timelineEl = document.querySelector(".timeline");
+        const statNums = document.querySelectorAll(".stat .stat-num");
+
+        function apiUrl(path) {
+            const base = (window.API_BASE || "").trim();
+            if (!base) return path;
+            if (base.endsWith("/")) return base.slice(0, -1) + path;
+            return base + path;
+        }
+
+        function setBusy(isBusy) {
+            uploadZone.style.pointerEvents = isBusy ? "none" : "auto";
+            ctaBtn.disabled = isBusy;
+            ctaBtn.style.opacity = isBusy ? "0.7" : "1";
+        }
+
+        function guessPlatform(fileName) {
+            const lower = (fileName || "").toLowerCase();
+            if (lower.endsWith(".txt")) return "whatsapp";
+            if (lower.endsWith(".json")) return "generic";
+            return "generic";
+        }
+
+        function formatTs(iso) {
+            const date = new Date(iso);
+            if (Number.isNaN(date.getTime())) return iso || "";
+            return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).replace(",", " •");
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#39;");
+        }
+
+        function renderReport(report) {
+            const score = Math.round(Number(report.mixed_signal_index || 0));
+            signalBadge.textContent = score + "% MIXED SIGNALS";
+
+            const timelineRows = Array.isArray(report.timeline) ? report.timeline : [];
+            timelineEl.innerHTML = timelineRows.length
+                ? timelineRows.map((row) => {
+                    const type = (row.type === "warm" || row.type === "cool" || row.type === "mixed") ? row.type : "mixed";
+                    const tags = (row.tags || []).slice(0, 3);
+                    return (
+                        '<div class="timeline-entry ' + type + '">' +
+                            '<div class="timeline-time">' + escapeHtml(formatTs(row.timestamp)) + '</div>' +
+                            '<div class="timeline-msg">"' + escapeHtml(row.message || "") + '"</div>' +
+                            tags.map((tag) => '<span class="tag ' + type + '">' + escapeHtml(tag) + '</span>').join("") +
+                        '</div>'
+                    );
+                }).join("")
+                : '<div class="timeline-entry mixed"><div class="timeline-time">no timeline data</div><div class="timeline-msg">analysis completed but no highlight windows were available.</div></div>';
+
+            const stats = report.stats || {};
+            if (statNums[0]) statNums[0].textContent = String(Math.round(Number(stats.initiation_percent || 0))) + "%";
+            if (statNums[1]) statNums[1].textContent = String(Number(stats.reply_delay_ratio || 1).toFixed(1)) + "x";
+            if (statNums[2]) statNums[2].textContent = String(Math.round(Number(stats.red_flags || 0)));
+        }
+
+        async function runAnalysisFlow(file) {
+            errorEl.textContent = "";
+            setBusy(true);
+            try {
+                statusEl.textContent = "uploading...";
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("platform", guessPlatform(file.name));
+                formData.append("timezone_name", Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+
+                const uploadRes = await fetch(apiUrl("/compat/upload"), { method: "POST", body: formData });
+                if (!uploadRes.ok) throw new Error("upload failed");
+                const uploadData = await uploadRes.json();
+
+                statusEl.textContent = "analyzing...";
+                const analyzeRes = await fetch(apiUrl("/compat/uploads/" + uploadData.upload_id + "/analyze"), { method: "POST" });
+                if (!analyzeRes.ok) throw new Error("analysis start failed");
+                const analyzeData = await analyzeRes.json();
+
+                let completed = false;
+                const started = Date.now();
+                while (!completed) {
+                    if (Date.now() - started > 5 * 60 * 1000) throw new Error("analysis timed out");
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                    const jobRes = await fetch(apiUrl("/compat/jobs/" + analyzeData.job_id));
+                    if (!jobRes.ok) throw new Error("job status failed");
+                    const job = await jobRes.json();
+                    if (job.status === "failed") throw new Error(job.error || "analysis failed");
+                    if (job.status === "succeeded") completed = true;
+                }
+
+                const reportRes = await fetch(apiUrl("/compat/reports/" + uploadData.upload_id));
+                if (!reportRes.ok) throw new Error("report fetch failed");
+                const report = await reportRes.json();
+                renderReport(report);
+                statusEl.textContent = "complete";
+            } catch (err) {
+                statusEl.textContent = "";
+                errorEl.textContent = "something went wrong while processing your chat. please try again.";
+            } finally {
+                setBusy(false);
+                fileInput.value = "";
+            }
+        }
+
+        uploadZone.addEventListener("click", function () { fileInput.click(); });
+        ctaBtn.addEventListener("click", function () { fileInput.click(); });
+        fileInput.addEventListener("change", function (event) {
+            const file = event.target.files && event.target.files[0];
+            if (file) runAnalysisFlow(file);
+        });
+    })();
+</script>
+</body>
+</html>
+
+
+
+
+

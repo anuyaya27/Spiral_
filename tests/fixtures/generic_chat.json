@@ -1,0 +1,10 @@
+{
+  "participants": ["A", "B"],
+  "messages": [
+    {"ts": "2025-12-01T10:00:00Z", "sender": "A", "text": "I miss you"},
+    {"ts": "2025-12-01T20:00:00Z", "sender": "B", "text": "maybe later, busy"},
+    {"ts": "2025-12-02T09:00:00Z", "sender": "A", "text": "let's plan dinner"},
+    {"ts": "2025-12-04T18:00:00Z", "sender": "B", "text": "not ready"}
+  ]
+}
+
