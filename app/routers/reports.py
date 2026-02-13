@@ -11,8 +11,16 @@ from app.models.upload import Upload
 from app.models.user import User
 from app.routers.deps import get_current_user
 from app.schemas.llm_report import LLMReport
+from app.services.analysis.highlights import enrich_report_for_ui
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+def _normalize_report_payload(payload: dict) -> dict:
+    normalized = dict(payload or {})
+    if isinstance(normalized.get("timeline"), list):
+        normalized["timeline"] = normalized["timeline"][:10]
+    return normalized
 
 
 @router.get("/{upload_id}", response_model=LLMReport)
@@ -23,7 +31,10 @@ def get_report(upload_id: str, db: Session = Depends(get_db), current_user: User
     report = db.scalar(select(Report).where(Report.upload_id == upload_id))
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    return LLMReport.model_validate(report.report_json)
+    payload = _normalize_report_payload(report.report_json)
+    payload = LLMReport.model_validate(payload).model_dump(mode="json")
+    payload = enrich_report_for_ui(payload, top_n=10)
+    return LLMReport.model_validate(payload)
 
 
 @router.get("/{upload_id}/highlights")
@@ -34,8 +45,10 @@ def get_highlights(upload_id: str, db: Session = Depends(get_db), current_user: 
     report = db.scalar(select(Report).where(Report.upload_id == upload_id))
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    payload = LLMReport.model_validate(report.report_json).model_dump(mode="json")
-    return {"upload_id": upload_id, "highlights": payload.get("timeline", [])}
+    payload = _normalize_report_payload(report.report_json)
+    payload = LLMReport.model_validate(payload).model_dump(mode="json")
+    payload = enrich_report_for_ui(payload, top_n=10)
+    return {"upload_id": upload_id, "highlights": payload.get("highlights", [])}
 
 
 @router.get("/{upload_id}/download")
@@ -53,7 +66,8 @@ def download_report(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     if format == "pdf":
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="PDF export is not implemented yet")
-    payload = LLMReport.model_validate(report.report_json).model_dump(mode="json")
+    payload = _normalize_report_payload(report.report_json)
+    payload = LLMReport.model_validate(payload).model_dump(mode="json")
     payload = {
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "upload_id": upload_id,

@@ -20,10 +20,18 @@ from app.models.upload import Upload
 from app.services.parsing.chat_parser import parse_chat_file
 from app.services.storage import ensure_upload_dir
 from app.services.analysis.runner import analyze_upload_and_store
+from app.services.analysis.highlights import enrich_report_for_ui
 from app.schemas.llm_report import LLMReport
 
 router = APIRouter(prefix="/compat", tags=["compat"])
 logger = logging.getLogger(__name__)
+
+
+def _normalize_report_payload(payload: dict) -> dict:
+    normalized = dict(payload or {})
+    if isinstance(normalized.get("timeline"), list):
+        normalized["timeline"] = normalized["timeline"][:10]
+    return normalized
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -199,7 +207,9 @@ async def compat_analyze(upload_id: str, request: Request, db: Session = Depends
     except Exception as exc:  # noqa: BLE001
         logger.exception("compat_analyze_failed", extra={"upload_id": upload.id})
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Analysis failed. Please retry.") from exc
+    report_payload = _normalize_report_payload(report_payload)
     result = LLMReport.model_validate(report_payload).model_dump(mode="json")
+    result = enrich_report_for_ui(result, top_n=10)
     sample_messages = [
         {
             "ts": (row.ts.astimezone(timezone.utc).isoformat() if row.ts else None),
@@ -230,7 +240,10 @@ def compat_report(upload_id: str, db: Session = Depends(get_db)) -> dict:
     report = db.scalar(select(Report).where(Report.upload_id == upload_id))
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    return report.report_json
+    payload = _normalize_report_payload(report.report_json)
+    payload = LLMReport.model_validate(payload).model_dump(mode="json")
+    payload = enrich_report_for_ui(payload, top_n=10)
+    return payload
 
 
 def _platform_from_filename(filename: str) -> str:

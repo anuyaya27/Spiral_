@@ -37,6 +37,8 @@ def analyze_upload_and_store(db: Session, upload_id: str, job: Job | None = None
         db.commit()
 
     report_payload = analyze_chat_with_llm(normalized)
+    if isinstance(report_payload.get("timeline"), list):
+        report_payload["timeline"] = report_payload["timeline"][:10]
 
     existing_report = db.scalar(select(Report).where(Report.upload_id == upload_id))
     if existing_report:
@@ -68,4 +70,3 @@ def analyze_upload_and_store(db: Session, upload_id: str, job: Job | None = None
 
     db.commit()
     return report_payload
-

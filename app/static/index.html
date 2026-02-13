@@ -434,28 +434,29 @@
             text-transform: uppercase;
         }
 
-        .feed-filter {
-            display: inline-flex;
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 10px;
             margin-bottom: 12px;
-            padding: 8px 12px;
-            border-radius: 999px;
-            border: 2px solid #00FF00;
-            background: rgba(255, 255, 255, 0.08);
-            color: #bfffbf;
-            font-weight: 700;
-            font-size: 13px;
+            position: relative;
+            z-index: 1;
         }
 
-        .feed-filter button {
+        .tab {
             border: 2px solid #00FF00;
             border-radius: 999px;
             background: transparent;
             color: #bfffbf;
             font-weight: 800;
-            padding: 2px 10px;
+            padding: 6px 14px;
             cursor: pointer;
+        }
+
+        .tab.active {
+            background: #00FF00;
+            color: #1a1a1a;
         }
 
         .timeline-entry.match {
@@ -571,9 +572,10 @@
                 <div class="signal-badge">72% MIXED SIGNALS</div>
             </div>
 
-            <div id="feed-filter" class="feed-filter" hidden>
-                <span id="feed-filter-text"></span>
-                <button id="feed-filter-clear" type="button">Clear</button>
+            <div class="tabs" id="analysis-tabs">
+                <button type="button" class="tab active" data-filter="all">All</button>
+                <button type="button" class="tab" data-filter="slow_reply">Slow replies</button>
+                <button type="button" class="tab" data-filter="red_flag">Red flags</button>
             </div>
 
             <div class="timeline">
@@ -597,6 +599,10 @@
                     <span class="tag cool">LOW EFFORT</span>
                     <span class="tag cool">CLOSED OFF</span>
                 </div>
+            </div>
+            <div id="highlights-empty" class="timeline-entry mixed" hidden>
+                <div class="timeline-time">no highlights</div>
+                <div class="timeline-msg">No highlights available for this chat.</div>
             </div>
 
             <div class="stats">
@@ -630,7 +636,7 @@
 <script>
     window.API_BASE = window.API_BASE || "";
 
-    (function () {
+    document.addEventListener("DOMContentLoaded", function () {
         const uploadZone = document.querySelector(".upload-zone");
         const ctaBtn = document.getElementById("pick-file-btn");
         const analyzeBtn = document.getElementById("analyze-btn");
@@ -640,14 +646,14 @@
         const uploadTextEl = document.querySelector(".upload-text");
         const signalBadge = document.querySelector(".signal-badge");
         const timelineEl = document.querySelector(".timeline");
+        const highlightsEmptyEl = document.getElementById("highlights-empty");
         const statNums = document.querySelectorAll(".stat .stat-num");
+        const tabs = document.querySelectorAll(".tab[data-filter]");
         const statFilterCards = document.querySelectorAll(".stat.stat-filter");
-        const feedFilterEl = document.getElementById("feed-filter");
-        const feedFilterTextEl = document.getElementById("feed-filter-text");
-        const feedFilterClearEl = document.getElementById("feed-filter-clear");
         let readyUploadId = "";
         let analyzing = false;
         let activeFilter = "all";
+        let currentHighlights = [];
 
         function apiUrl(path) {
             const base = (window.API_BASE || "").trim();
@@ -690,23 +696,17 @@
             const score = Math.round(Number(report.mixed_signal_index || 0));
             signalBadge.textContent = score + "% MIXED SIGNALS";
 
-            const timelineRows = Array.isArray(report.timeline) ? report.timeline : [];
-            timelineEl.innerHTML = timelineRows.length
-                ? timelineRows.map((row) => {
-                    const type = (row.type === "warm" || row.type === "cool" || row.type === "mixed") ? row.type : "mixed";
-                    const tags = (row.tags || []).slice(0, 3);
-                    const rowId = String(row.message_id || row.id || row.timestamp || Math.random()).replaceAll('"', "");
-                    const filterTags = inferFilterTags(row).join(" ");
-                    const dataTagsAttr = filterTags ? ' data-tags="' + escapeHtml(filterTags) + '"' : "";
-                    return (
-                        '<div class="timeline-entry ' + type + '" data-id="' + escapeHtml(rowId) + '"' + dataTagsAttr + '>' +
-                            '<div class="timeline-time">' + escapeHtml(formatTs(row.timestamp)) + '</div>' +
-                            '<div class="timeline-msg">"' + escapeHtml(row.message || "") + '"</div>' +
-                            tags.map((tag) => '<span class="tag ' + type + '">' + escapeHtml(tag) + '</span>').join("") +
-                        '</div>'
-                    );
-                }).join("")
-                : '<div class="timeline-entry mixed"><div class="timeline-time">no timeline data</div><div class="timeline-msg">analysis completed but no highlight windows were available.</div></div>';
+            const highlights = Array.isArray(report.highlights) ? report.highlights : [];
+            currentHighlights = highlights.map((item, index) => ({
+                id: String(item.id || item.timestamp || ("h-" + index)),
+                timestamp: item.timestamp,
+                sender: item.sender || "Unknown",
+                excerpt: item.excerpt || "",
+                type: item.type || "mixed_signal",
+                label: item.label || "Signal evidence",
+                tags: Array.isArray(item.tags) ? item.tags : [],
+            }));
+            renderHighlightsList();
 
             const stats = report.stats || {};
             if (statNums[0]) statNums[0].textContent = String(Math.round(Number(stats.initiation_percent || 0))) + "%";
@@ -715,36 +715,25 @@
             applyFilter();
         }
 
-        function inferFilterTags(row) {
-            const tags = [];
-            const rowTags = Array.isArray(row.tags) ? row.tags.map((item) => String(item).toLowerCase()) : [];
-            const meta = row.meta || row.metadata || {};
-
-            const hasSlowReply = Boolean(
-                row.slow_reply === true ||
-                meta.slow_reply === true ||
-                typeof row.reply_delay_sec === "number" ||
-                typeof meta.reply_delay_sec === "number" ||
-                typeof row.delay === "number" ||
-                typeof meta.delay === "number" ||
-                rowTags.some((item) => item.includes("slow") || item.includes("delay") || item.includes("latency"))
-            );
-            if (hasSlowReply) tags.push("slow_reply");
-
-            const hasRedFlag = Boolean(
-                row.red_flag === true ||
-                meta.red_flag === true ||
-                meta.reason ||
-                row.reason ||
-                rowTags.some((item) => item.includes("red flag") || item.includes("boundary") || item.includes("contradiction") || item.includes("mixed signal"))
-            );
-            if (hasRedFlag) tags.push("red_flag");
-
-            return tags;
+        function renderHighlightsList() {
+            timelineEl.innerHTML = currentHighlights.length
+                ? currentHighlights.map((item) => {
+                    const entryType = item.type === "slow_reply" ? "cool" : (item.type === "red_flag" ? "mixed" : "warm");
+                    const tags = [item.label].concat(item.tags || []).slice(0, 3);
+                    return (
+                        '<div class="timeline-entry ' + entryType + '" data-id="' + escapeHtml(item.id) + '" data-type="' + escapeHtml(item.type) + '">' +
+                            '<div class="timeline-time">' + escapeHtml(formatTs(item.timestamp)) + ' • ' + escapeHtml(item.sender) + '</div>' +
+                            '<div class="timeline-msg">"' + escapeHtml(item.excerpt) + '"</div>' +
+                            tags.map((tag) => '<span class="tag ' + entryType + '">' + escapeHtml(tag) + '</span>').join("") +
+                        '</div>'
+                    );
+                }).join("")
+                : "";
         }
 
-        function setActiveFilter(nextFilter) {
-            activeFilter = activeFilter === nextFilter ? "all" : nextFilter;
+        function setActiveFilter(nextFilter, toggle) {
+            if (toggle && activeFilter === nextFilter) activeFilter = "all";
+            else activeFilter = nextFilter;
             applyFilter();
         }
 
@@ -752,43 +741,33 @@
             const cards = Array.from(timelineEl.querySelectorAll(".timeline-entry"));
             const isFilterActive = activeFilter !== "all";
 
+            tabs.forEach((tab) => {
+                tab.classList.toggle("active", tab.dataset.filter === activeFilter);
+            });
             statFilterCards.forEach((card) => {
                 card.classList.toggle("active", card.dataset.filter === activeFilter);
             });
 
-            if (!isFilterActive) {
-                cards.forEach((card) => {
-                    card.hidden = false;
-                    card.classList.remove("match");
-                    card.removeAttribute("data-match");
-                });
-                feedFilterEl.hidden = true;
-                return;
-            }
-
-            const matchedIndexes = [];
-            cards.forEach((card, index) => {
-                const tagSet = (card.dataset.tags || "").split(/\s+/).filter(Boolean);
-                if (tagSet.includes(activeFilter)) matchedIndexes.push(index);
-            });
-
-            const visibleIndexes = new Set();
-            matchedIndexes.forEach((index) => {
-                visibleIndexes.add(index);
-                if (index > 0) visibleIndexes.add(index - 1);
-                if (index < cards.length - 1) visibleIndexes.add(index + 1);
-            });
-
-            cards.forEach((card, index) => {
-                const isMatch = matchedIndexes.includes(index);
-                card.hidden = !visibleIndexes.has(index);
-                card.classList.toggle("match", isMatch);
-                if (isMatch) card.dataset.match = "1";
+            cards.forEach((card) => {
+                const cardType = card.dataset.type || "mixed_signal";
+                const isMatch = !isFilterActive || cardType === activeFilter;
+                card.hidden = !isMatch;
+                card.classList.toggle("match", isFilterActive && isMatch);
+                if (isFilterActive && isMatch) card.dataset.match = "1";
                 else card.removeAttribute("data-match");
             });
 
-            feedFilterTextEl.textContent = "Showing: " + (activeFilter === "slow_reply" ? "Slow replies" : "Red flags");
-            feedFilterEl.hidden = false;
+            const visibleCount = cards.filter((card) => !card.hidden).length;
+            if (visibleCount > 0) {
+                highlightsEmptyEl.hidden = true;
+                return;
+            }
+            const message =
+                activeFilter === "red_flag"
+                    ? "No red flags detected in this chat."
+                    : (activeFilter === "slow_reply" ? "No slow replies detected in this chat." : "No highlights available for this chat.");
+            highlightsEmptyEl.querySelector(".timeline-msg").textContent = message;
+            highlightsEmptyEl.hidden = false;
         }
 
         async function uploadFile(file) {
@@ -869,20 +848,21 @@
             event.preventDefault();
             analyzeUploadedFile();
         });
-        statFilterCards.forEach((card) => {
-            card.addEventListener("click", function () {
-                setActiveFilter(card.dataset.filter || "all");
+        tabs.forEach((tab) => {
+            tab.addEventListener("click", function () {
+                setActiveFilter(tab.dataset.filter || "all", false);
             });
         });
-        feedFilterClearEl.addEventListener("click", function () {
-            activeFilter = "all";
-            applyFilter();
+        statFilterCards.forEach((card) => {
+            card.addEventListener("click", function () {
+                setActiveFilter(card.dataset.filter || "all", true);
+            });
         });
         fileInput.addEventListener("change", function (event) {
             const file = event.target.files && event.target.files[0];
             if (file) uploadFile(file);
         });
-    })();
+    });
 </script>
 </body>
 </html>

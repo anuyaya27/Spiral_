@@ -30,6 +30,15 @@ class StatsPayload(BaseModel):
     red_flags: int
 
 
+class HighlightItem(BaseModel):
+    type: Literal["red_flag", "slow_reply", "mixed_signal"]
+    label: str
+    timestamp: str
+    sender: str
+    excerpt: str
+    tags: list[str] = Field(default_factory=list)
+
+
 class LLMReport(BaseModel):
     mixed_signal_index: int = Field(ge=0, le=100)
     confidence: float = Field(ge=0, le=1)
@@ -37,4 +46,4 @@ class LLMReport(BaseModel):
     timeline: list[TimelineItem] = Field(default_factory=list, max_length=10)
     stats: StatsPayload
     signals: list[SignalItem] = Field(default_factory=list)
-
+    highlights: list[HighlightItem] = Field(default_factory=list)

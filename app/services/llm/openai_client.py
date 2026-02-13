@@ -31,7 +31,8 @@ def analyze_chat_with_llm(messages: list[dict]) -> dict:
         "timeline:[{timestamp:ISO8601,message:str,tags:[str],type:warm|cool|mixed}] max 10 items, "
         "stats:{initiation_percent:number,reply_delay_ratio:number,red_flags:int}, "
         "signals:[{name:str,score:0..1,explanation:str,evidence:[{timestamp:ISO8601,excerpt:str,sender:str}]}]}. "
-        "Evidence excerpts must be direct text from provided messages."
+        "Evidence excerpts must be direct text from provided messages. "
+        "Timeline must contain AT MOST 10 items; if more candidates exist, include only the most significant moments."
     )
 
     raw = _request_json(
@@ -42,10 +43,12 @@ def analyze_chat_with_llm(messages: list[dict]) -> dict:
         user_payload=payload,
     )
 
+    raw = _enforce_timeline_limit(raw)
     try:
         report = LLMReport.model_validate(raw)
     except ValidationError:
         repaired = _request_json_repair(client, settings.openai_model, raw)
+        repaired = _enforce_timeline_limit(repaired)
         report = LLMReport.model_validate(repaired)
 
     normalized = report.model_dump(mode="json")
@@ -127,6 +130,12 @@ def _request_json(
     )
     content = completion.choices[0].message.content or "{}"
     return json.loads(content)
+
+
+def _enforce_timeline_limit(payload: dict) -> dict:
+    if isinstance(payload, dict) and isinstance(payload.get("timeline"), list):
+        payload["timeline"] = payload["timeline"][:10]
+    return payload
 
 
 def _request_json_repair(client: OpenAI, model: str, invalid_json: dict) -> dict:
