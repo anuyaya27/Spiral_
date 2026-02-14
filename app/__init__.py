@@ -1,2 +1,1 @@
-"""Mixed Signals Recognition backend package."""
-
+"""Spiral backend package."""

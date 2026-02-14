@@ -1,4 +1,4 @@
-# Mixed Signals Recognition Backend
+# Spiral Backend
 
 FastAPI backend for uploading chat exports, normalizing messages, and generating structured mixed-signals reports with the OpenAI API.
 
